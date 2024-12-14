@@ -60,9 +60,6 @@
             padding: 10px 20px;
         }
     </style>
-    <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-analytics.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js"></script>
 </head>
 
 <body>
@@ -71,7 +68,6 @@
     <div class="form-toggle">
         <button type="button" onclick="showForm('restaurantForm')">Restaurant Form</button>
         <button type="button" onclick="showForm('dishForm')">Dish Form</button>
-        <button type="button" onclick="showForm('downloadForm')">Download Form</button>
     </div>
 
     <form id="restaurantForm" class="active">
@@ -121,21 +117,63 @@
         <button type="button" onclick="handleDishSubmit()">Submit</button>
     </form>
 
-    <form id="downloadForm">
-        <label for="downloadOption">Choose Download Option</label>
-        <select id="downloadOption" name="downloadOption">
-            <option value="csv">CSV</option>
-            <option value="json">JSON</option>
-        </select>
+    <script>
+        var restaurants = [];
+        var dishes = [];
 
-        <button type="button" onclick="alert('Download initiated!')">Download</button>
-    </form>
+        function getData() {
+            const fetchDishes = fetch(`https://675d1ce8fe09df667f656411.mockapi.io/api/itss/dish`, {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            }).then((response) => response.json());
 
-    <script type="module">
-        
+            const fetchRestaurants = fetch(`https://675d1ce8fe09df667f656411.mockapi.io/api/itss/restaurant`, {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            }).then((response) => response.json());
 
-        const restaurants = [];
-        const dishes = [];
+            Promise.all([fetchDishes, fetchRestaurants])
+                .then(([dishesData, restaurantsData]) => {
+                    dishes = dishesData;
+                    restaurants = restaurantsData;
+
+                    console.log("Dishes:", dishes);
+                    console.log("Restaurants:", restaurants);
+                    const select = document.getElementById('restaurantSelect');
+                    select.innerHTML = '<option value="" disabled selected>Select a restaurant</option>';
+                    restaurants.forEach((restaurant, index) => {
+                        const option = document.createElement('option');
+                        option.value = restaurant.restaurant_id;
+                        option.textContent = restaurant.name;
+                        select.appendChild(option);
+                    });
+                })
+                .catch((error) => {
+                    console.error("Error :", error);
+                });
+
+        }
+
+        function postData(enpoint, body) {
+            fetch(`https://675d1ce8fe09df667f656411.mockapi.io/api/itss/${enpoint}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            })
+                .then((response) => response.json())
+                .then((data) => {
+                    console.log(data);
+                })
+                .catch((error) => console.error("Error:", error));
+        }
+
+
+        getData();
+
         function showForm(formId) {
             const forms = document.querySelectorAll('form');
             forms.forEach(form => {
@@ -188,8 +226,6 @@
             const rating = formData.get('rating');
             const imageFile = formData.get('image');
 
-            console.log(imageFile);
-
             const imageUrl = imageFile.size != 0 ? await uploadImage(imageFile) : '';
             navigator.geolocation.getCurrentPosition(
                 (position) => {
@@ -197,7 +233,6 @@
                     const longitude = position.coords.longitude;
 
                     const restaurant = {
-                        restaurant_id: restaurants.length + 1,
                         name,
                         address,
                         contact,
@@ -209,10 +244,11 @@
                     };
 
                     restaurants.push(restaurant);
+                    populateRestaurantSelect();
+                    postData("restaurant", restaurant);
                     console.log('Restaurant added:', restaurant);
                     alert('Restaurant added successfully!');
                     form.reset();
-                    populateRestaurantSelect();
                 },
                 (error) => {
                     console.error('Error getting location:', error);
@@ -245,7 +281,6 @@
                 const imageUrl = dishImageFile.size != 0 ? await uploadImage(dishImageFile) : '';
 
                 const dish = {
-                    dish_id: dishes.length + 1,
                     name: dishName,
                     price,
                     description,
@@ -255,6 +290,7 @@
                 };
 
                 dishes.push(dish);
+                postData("dish", dish);
                 console.log('Dish added:', dish);
                 alert('Dish added successfully!');
                 form.reset();
